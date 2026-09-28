@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Corvus DOM Extension",
+  "version": "0.1.0",
+  "description": "Built-in GeckoSession WebExtension for DOM pruning and accessibility tree extraction",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/index.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "permissions": ["<all_urls>"]
+}

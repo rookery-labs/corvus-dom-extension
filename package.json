@@ -1,0 +1,26 @@
+{
+  "name": "@rookery/corvus-dom-extension",
+  "version": "0.1.0",
+  "description": "Corvus DOM Extension - Built-in WebExtension for GeckoSession: high-performance DOM pruning, A11y tree extraction, and WeakRef element registry",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "geckoview",
+    "webextension",
+    "dom-pruning",
+    "accessibility-tree",
+    "agentic-browser"
+  ],
+  "author": "Rookery Labs",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "happy-dom": "^15.11.7",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
