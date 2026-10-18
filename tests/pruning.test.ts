@@ -98,4 +98,59 @@ describe("DomPruner (SDD Specification SPEC-DOM-001)", () => {
     expect(reductionRatio).toBeGreaterThan(0.70);
     expect(observation.interactiveCount).toBe(50);
   });
+
+  it("should retain aria-haspopup attribute on trigger elements", () => {
+    document.body.innerHTML = `
+      <div>
+        <button id="menu-btn" aria-haspopup="menu">Open Menu</button>
+        <div role="combobox" aria-haspopup="listbox">Select item</div>
+      </div>
+    `;
+
+    const observation = pruner.observe(document);
+    expect(observation.tree).toContain('aria-haspopup="menu"');
+    expect(observation.tree).toContain('aria-haspopup="listbox"');
+  });
+
+  it("should emit accessible graphic fallback for SVG and Canvas elements with aria-label or title", () => {
+    document.body.innerHTML = `
+      <div>
+        <svg aria-label="Search icon"><path d="M0 0"/></svg>
+        <svg><circle r="10"/></svg>
+        <canvas title="Revenue Chart" width="100" height="100"></canvas>
+        <canvas width="50" height="50"></canvas>
+        <svg aria-label="Hidden icon" aria-hidden="true"></svg>
+      </div>
+    `;
+
+    const observation = pruner.observe(document);
+    // Labeled SVG & Canvas emit graphic nodes
+    expect(observation.tree).toContain('graphic (role=img) [label="Search icon"]');
+    expect(observation.tree).toContain('graphic (role=img) [label="Revenue Chart"]');
+
+    // Unlabeled SVG & Canvas are stripped
+    expect(observation.tree).not.toContain("circle");
+    expect(observation.tree).not.toContain("canvas");
+
+    // Hidden SVG is omitted
+    expect(observation.tree).not.toContain("Hidden icon");
+  });
+
+  it("should detect elements with inline or programmatic onclick as interactive", () => {
+    document.body.innerHTML = `
+      <div>
+        <div id="clickable-card" onclick="openDetails()">Custom Card</div>
+        <span id="static-span">Static Text</span>
+      </div>
+    `;
+
+    // Attach programmatic onclick
+    const span = document.getElementById("static-span")!;
+    (span as any).onclick = () => console.log("clicked");
+
+    const observation = pruner.observe(document);
+    expect(observation.interactiveCount).toBe(2);
+    expect(observation.tree).toContain("Custom Card");
+    expect(observation.tree).toContain("Static Text");
+  });
 });

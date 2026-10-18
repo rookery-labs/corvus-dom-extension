@@ -56,7 +56,7 @@ export class JsonRpcDispatcher {
               jsonrpc: "2.0",
               id: request.id,
               error: {
-                code: -32000,
+                code: execResult.errorCode ?? -32000,
                 message: execResult.errorMessage || "Action execution failed",
                 data: execResult,
               },
@@ -102,35 +102,44 @@ export class JsonRpcDispatcher {
 
   public async executeAction(params: ActionExecuteParams): Promise<ActionExecuteResult> {
     const startTime = performance.now();
-    const element = this.registry.get(params.nodeId);
+    const resolution = this.registry.resolve(params.nodeId);
 
-    if (!element) {
+    if (!resolution.success) {
       return {
         success: false,
         nodeId: params.nodeId,
         actionType: params.actionType,
         executionTimeMs: performance.now() - startTime,
-        errorMessage: `Node [#${params.nodeId}] not found in registry or garbage-collected`,
+        errorMessage: resolution.message,
+        errorCode: resolution.code,
       };
     }
 
-    if (!element.isConnected) {
-      return {
-        success: false,
-        nodeId: params.nodeId,
-        actionType: params.actionType,
-        executionTimeMs: performance.now() - startTime,
-        errorMessage: `Node [#${params.nodeId}] is detached from DOM`,
-      };
-    }
+    const element = resolution.element;
 
     try {
       switch (params.actionType) {
         case "click": {
-          if (typeof (element as HTMLElement).click === "function") {
-            (element as HTMLElement).click();
-          } else {
-            element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+          const form = (element as any).form as HTMLFormElement | undefined;
+          let submitGuard: ((e: Event) => void) | null = null;
+
+          if (form) {
+            submitGuard = (e: Event) => {
+              e.preventDefault();
+            };
+            form.addEventListener("submit", submitGuard, { capture: true, once: true });
+          }
+
+          try {
+            if (typeof (element as HTMLElement).click === "function") {
+              (element as HTMLElement).click();
+            } else {
+              element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            }
+          } finally {
+            if (form && submitGuard) {
+              form.removeEventListener("submit", submitGuard, { capture: true });
+            }
           }
           break;
         }
@@ -160,6 +169,72 @@ export class JsonRpcDispatcher {
           break;
         }
 
+        case "hover": {
+          element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false, cancelable: false }));
+          break;
+        }
+
+        case "select": {
+          if (element.tagName.toLowerCase() !== "select") {
+            return {
+              success: false,
+              nodeId: params.nodeId,
+              actionType: params.actionType,
+              executionTimeMs: performance.now() - startTime,
+              errorMessage: `Target node [#${params.nodeId}] is not a <select> element (tag: <${element.tagName.toLowerCase()}>)`,
+              errorCode: -32000,
+            };
+          }
+
+          const selectEl = element as HTMLSelectElement;
+          const targetValue = params.value !== undefined ? params.value : params.text;
+
+          if (targetValue === undefined) {
+            return {
+              success: false,
+              nodeId: params.nodeId,
+              actionType: params.actionType,
+              executionTimeMs: performance.now() - startTime,
+              errorMessage: "Parameter 'value' or 'text' is required for select action",
+              errorCode: -32602,
+            };
+          }
+
+          const options = Array.from(selectEl.options || selectEl.querySelectorAll("option"));
+          let matchedOption = options.find((opt) => opt.value === targetValue);
+          if (!matchedOption) {
+            matchedOption = options.find(
+              (opt) => opt.text === targetValue || opt.textContent?.trim() === targetValue
+            );
+          }
+
+          if (!matchedOption) {
+            return {
+              success: false,
+              nodeId: params.nodeId,
+              actionType: params.actionType,
+              executionTimeMs: performance.now() - startTime,
+              errorMessage: `Option matching '${targetValue}' not found in <select>`,
+              errorCode: -32000,
+            };
+          }
+
+          if (!selectEl.multiple) {
+            for (const opt of options) {
+              opt.selected = false;
+            }
+            matchedOption.selected = true;
+            selectEl.value = matchedOption.value;
+          } else {
+            matchedOption.selected = true;
+          }
+
+          element.dispatchEvent(new Event("input", { bubbles: true }));
+          element.dispatchEvent(new Event("change", { bubbles: true }));
+          break;
+        }
+
         default:
           return {
             success: false,
@@ -167,6 +242,7 @@ export class JsonRpcDispatcher {
             actionType: params.actionType,
             executionTimeMs: performance.now() - startTime,
             errorMessage: `Unsupported action type: ${params.actionType}`,
+            errorCode: -32602,
           };
       }
 
@@ -183,6 +259,7 @@ export class JsonRpcDispatcher {
         actionType: params.actionType,
         executionTimeMs: performance.now() - startTime,
         errorMessage: error?.message || "Execution exception",
+        errorCode: -32000,
       };
     }
   }
