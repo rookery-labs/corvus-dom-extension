@@ -23,5 +23,13 @@ This repository encapsulates the built-in TypeScript WebExtension running in `Ge
    - Purge dead entries during sweeps or navigation commits.
 3. **JSON-RPC 2.0 Contracts (`specs/jsonrpc-contracts.json`):**
    - Strictly validate `dom.observation`, `action.execute`, and `agent.status_update`.
-4. **Testing Protocol:**
+4. **Branch & Worktree Isolation (Sanctuary of `main`):**
+   - Strictly prohibit direct commits or pushes on `main`.
+   - All work must be conducted in dedicated branches (`feat/...`, `fix/...`) within an isolated worktree (`just worktree-add`).
+   - Merge only when `npm test` and `npm run typecheck` are 100% green.
+5. **Renovate Automated Dependencies & Zero-Touch Release:**
+   - Automated dependency PRs (patch/minor) merge automatically to `main` upon passing all Vitest tests and typechecks.
+   - Merges to `main` automatically publish a new semantic release and tag.
+6. **Testing Protocol:**
    - Run `npm test` and `npm run build` before every commit.
+
